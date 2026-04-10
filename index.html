@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Web Guitar — Play in Your Browser</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --wood-light: #f5ece0;
+      --wood-mid:   #e8d5b8;
+      --wood-dark:  #c9a87c;
+      --wood-deep:  #9c7040;
+      --wood-grain: #b8905a;
+      --string-1: #8a6020;
+      --string-2: #7a5015;
+      --accent:   #c8731a;
+      --accent2:  #e8960a;
+      --fret-metal: #b0a090;
+      --nut-color: #f0e0c0;
+      --bg: #fdf6ed;
+      --surface: #fff8f0;
+      --border: #e0cdb0;
+      --text-main: #3a2810;
+      --text-muted: #8a7055;
+      --text-hint: #b09070;
+      --dot-color: #d4b890;
+      --key-bg: #fff8f0;
+      --key-border: #d8c4a0;
+      --active-fret: #ffd580;
+      --playing-ring: #ff9c2a;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 0 0 40px;
+    }
+
+    /* ── HERO HEADER ── */
+    .hero {
+      background: var(--wood-mid);
+      border-bottom: 3px solid var(--wood-dark);
+      padding: 22px 32px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .hero-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 32px;
+      font-weight: 900;
+      color: var(--text-main);
+      letter-spacing: -0.5px;
+      line-height: 1;
+    }
+    .hero-sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      font-weight: 400;
+    }
+    .hero-controls {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .ctrl-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .ctrl-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .ctrl-val {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      min-width: 36px;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100px;
+      height: 4px;
+      background: var(--wood-dark);
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+      border: 2px solid #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    }
+    select.tuning {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      color: var(--text-main);
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      cursor: pointer;
+      outline: none;
+    }
+    select.tuning:focus { border-color: var(--accent); }
+
+    /* ── MAIN LAYOUT ── */
+    .main { max-width: 1100px; margin: 0 auto; padding: 24px 20px 0; }
+
+    /* ── FRETBOARD ── */
+    .fretboard-section {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 20px rgba(160,120,60,0.10);
+    }
+    .fretboard-scroll { overflow-x: auto; }
+    .fretboard {
+      display: grid;
+      grid-template-columns: 52px repeat(12, minmax(60px, 1fr));
+      min-width: 800px;
+    }
+
+    /* header row */
+    .fh {
+      background: var(--wood-mid);
+      height: 34px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border-bottom: 2px solid var(--wood-dark);
+      border-right: 1px solid var(--wood-dark);
+      position: relative;
+    }
+    .fh.nut-col {
+      border-right: 4px solid var(--nut-color);
+      font-family: 'Playfair Display', serif;
+      font-size: 18px;
+      color: var(--wood-deep);
+    }
+    .fh.has-dot::after {
+      content: '';
+      position: absolute;
+      bottom: 3px;
+      width: 7px; height: 7px;
+      background: var(--dot-color);
+      border-radius: 50%;
+    }
+    .fh.has-dot2::after {
+      content: '';
+      position: absolute;
+      bottom: 3px;
+      width: 14px; height: 7px;
+      background: var(--dot-color);
+      border-radius: 4px;
+    }
+
+    /* string label */
+    .sl {
+      display: flex; align-items: center; justify-content: center;
+      height: 52px;
+      background: var(--wood-light);
+      border-bottom: 1px solid var(--border);
+      border-right: 4px solid var(--nut-color);
+      font-family: 'Playfair Display', serif;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: default;
+      position: relative;
+    }
+
+    /* fret cells */
+    .fc {
+      height: 52px;
+      background: var(--wood-light);
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--fret-metal);
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.06s;
+    }
+    .fc::before {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+    .fc.s5::before { height: 3px; background: linear-gradient(90deg, #999 0%, #ccc 40%, #999 100%); margin-top: -1.5px; }
+    .fc.s4::before { height: 2.5px; background: linear-gradient(90deg, #aaa 0%, #ddd 40%, #aaa 100%); margin-top: -1.25px; }
+    .fc.s3::before { height: 2px; background: linear-gradient(90deg, #bbb 0%, #e5e5e5 40%, #bbb 100%); margin-top: -1px; }
+    .fc.s2::before { height: 1.5px; background: linear-gradient(90deg, #ccc 0%, #eee 40%, #ccc 100%); margin-top: -0.75px; }
+    .fc.s1::before { height: 1px; background: linear-gradient(90deg, #ccc 0%, #f5f5f5 40%, #ccc 100%); margin-top: -0.5px; }
+    .fc.s0::before { height: 0.75px; background: linear-gradient(90deg, #ccc 0%, #fafafa 40%, #ccc 100%); }
+
+    .fc:hover { background: #f0e8d8; }
+    .fc.active { background: #fff0cc; }
+    .fc.active::after {
+      content: '';
+      position: absolute;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--active-fret);
+      border: 2px solid var(--accent2);
+      z-index: 2;
+      opacity: 0.9;
+    }
+    .fc.playing::after {
+      content: '';
+      position: absolute;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: var(--playing-ring);
+      border: 2px solid #fff;
+      z-index: 2;
+      animation: pluck 0.45s ease-out forwards;
+    }
+    @keyframes pluck {
+      0%   { transform: scale(0.5); opacity: 1; }
+      60%  { transform: scale(1.1); opacity: 0.9; }
+      100% { transform: scale(1.3); opacity: 0; }
+    }
+
+    /* ── STATUS BAR ── */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 10px 18px;
+      background: var(--wood-mid);
+      border-top: 1.5px solid var(--wood-dark);
+      flex-wrap: wrap;
+    }
+    .sb-item { display: flex; align-items: center; gap: 6px; }
+    .sb-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+    .sb-val { font-size: 13px; font-weight: 700; color: var(--accent); }
+    .strum-indicator {
+      margin-left: auto;
+      font-size: 24px;
+      font-weight: 900;
+      color: var(--accent);
+      transition: transform 0.12s;
+      line-height: 1;
+    }
+
+    /* ── KEY GUIDE + BOTTOM ── */
+    .bottom-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+    @media (max-width: 640px) { .bottom-row { grid-template-columns: 1fr; } }
+
+    .guide-card {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .guide-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 10px;
+    }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      display: flex; flex-direction: column; align-items: center;
+      background: var(--key-bg);
+      border: 1.5px solid var(--key-border);
+      border-radius: 8px;
+      padding: 5px 8px;
+      min-width: 40px;
+      transition: background 0.08s, border-color 0.08s;
+    }
+    .chip .ck { font-size: 15px; font-weight: 700; color: var(--text-main); font-family: 'DM Sans', sans-serif; }
+    .chip .cl { font-size: 10px; color: var(--text-hint); margin-top: 1px; }
+    .chip.lit { background: #fff3cc; border-color: var(--accent); }
+    .chip.lit .ck { color: var(--accent); }
+
+    .legend-card {
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+    }
+    .legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .legend-item { display: flex; align-items: flex-start; gap: 8px; }
+    .legend-key {
+      background: var(--wood-mid);
+      border: 1.5px solid var(--wood-dark);
+      border-radius: 6px;
+      padding: 2px 7px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-main);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .legend-desc { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+
+    footer {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--text-hint);
+    }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<!-- HERO -->
+<div class="hero">
+  <div>
+    <div class="hero-title">&#9834; Web Guitar</div>
+    <div class="hero-sub">Hold number keys (frets) + letter keys (strings) &rarr; Arrow keys to strum</div>
+  </div>
+  <div class="hero-controls">
+    <div class="ctrl-group">
+      <span class="ctrl-label">Volume</span>
+      <input type="range" id="vol" min="0" max="100" value="75" step="1">
+      <span class="ctrl-val" id="vol-val">75%</span>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">Reverb</span>
+      <input type="range" id="rvb" min="0" max="100" value="30" step="1" style="width:80px">
+      <span class="ctrl-val" id="rvb-val">30%</span>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">Tuning</span>
+      <select class="tuning" id="tuning-sel">
+        <option value="standard">Standard E</option>
+        <option value="drop_d">Drop D</option>
+        <option value="open_g">Open G</option>
+        <option value="dadgad">DADGAD</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- FRETBOARD -->
+  <div class="fretboard-section">
+    <div class="fretboard-scroll">
+      <div class="fretboard" id="fretboard"></div>
+    </div>
+    <div class="status-bar">
+      <div class="sb-item"><span class="sb-label">Frets</span><span class="sb-val" id="st-frets">—</span></div>
+      <div class="sb-item"><span class="sb-label">Strings</span><span class="sb-val" id="st-strings">—</span></div>
+      <div class="sb-item"><span class="sb-label">Note</span><span class="sb-val" id="st-note">—</span></div>
+      <div class="sb-item"><span class="sb-label">Strum</span><span class="sb-val" id="st-strum">&#8597; arrows</span></div>
+      <div class="strum-indicator" id="strum-ind">&#8597;</div>
+    </div>
+  </div>
+
+  <!-- BOTTOM ROW -->
+  <div class="bottom-row">
+    <div>
+      <div class="guide-card" style="margin-bottom:12px">
+        <div class="guide-title">Fret keys — hold to press fret</div>
+        <div class="chips" id="fret-chips"></div>
+      </div>
+      <div class="guide-card">
+        <div class="guide-title">String keys — hold to select string</div>
+        <div class="chips" id="str-chips"></div>
+      </div>
+    </div>
+    <div class="legend-card">
+      <div class="guide-title">How to play</div>
+      <div class="legend-grid">
+        <div class="legend-item">
+          <span class="legend-key">1–9 0 - =</span>
+          <span class="legend-desc">Hold for frets 1–12</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-key">E A D G B H</span>
+          <span class="legend-desc">Hold for string (low&rarr;high)</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-key">&#8595; Arrow</span>
+          <span class="legend-desc">Strum downward</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-key">&#8593; Arrow</span>
+          <span class="legend-desc">Strum upward</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-key">Space</span>
+          <span class="legend-desc">Open strum all strings</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-key">Click cell</span>
+          <span class="legend-desc">Pluck single note</span>
+        </div>
+        <div class="legend-item" style="grid-column:1/-1">
+          <span class="legend-key">Example</span>
+          <span class="legend-desc">A string fret 12 &rarr; hold <b>=</b> + <b>A</b> then press <b>&#8595;</b></span>
+        </div>
+        <div class="legend-item" style="grid-column:1/-1">
+          <span class="legend-key">Example</span>
+          <span class="legend-desc">A string fret 1 &rarr; hold <b>1</b> + <b>A</b> then press <b>&#8595;</b></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Web Guitar &mdash; Built with the Web Audio API &bull; <a href="https://github.com" target="_blank">View on GitHub</a></footer>
+</div>
+
+<script>
+const TUNINGS = {
+  standard: { notes: ['E2','A2','D3','G3','B3','E4'] },
+  drop_d:   { notes: ['D2','A2','D3','G3','B3','E4'] },
+  open_g:   { notes: ['D2','G2','D3','G3','B3','D4'] },
+  dadgad:   { notes: ['D2','A2','D3','G3','A3','D4'] },
+};
+const STRING_KEYS   = ['e','a','d','g','b','h'];
+const STRING_LABELS = ['E','A','D','G','B','e'];
+const FRET_KEYS  = ['1','2','3','4','5','6','7','8','9','0','-','='];
+const FRET_NUMS  = [1,2,3,4,5,6,7,8,9,10,11,12];
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+let audioCtx = null, masterGain = null, dryGain = null, convolver = null, reverbGainNode = null;
+let volume = 0.75, reverbAmt = 0.30, currentTuning = 'standard';
+let heldFrets = new Set(), heldStrings = new Set();
+
+function initAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioCtx.createGain(); masterGain.gain.value = volume;
+  masterGain.connect(audioCtx.destination);
+  dryGain = audioCtx.createGain(); dryGain.gain.value = 1 - reverbAmt;
+  dryGain.connect(masterGain);
+  reverbGainNode = audioCtx.createGain(); reverbGainNode.gain.value = reverbAmt * 1.4;
+  convolver = audioCtx.createConvolver();
+  const rate = audioCtx.sampleRate, len = Math.floor(rate * 2.8);
+  const buf = audioCtx.createBuffer(2, len, rate);
+  for (let c = 0; c < 2; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < len; i++) d[i] = (Math.random()*2-1) * Math.pow(1 - i/len, 2.2);
+  }
+  convolver.buffer = buf;
+  convolver.connect(reverbGainNode);
+  reverbGainNode.connect(masterGain);
+}
+
+function getFreqAndNote(stringIdx, fret) {
+  const open = TUNINGS[currentTuning].notes[stringIdx];
+  const nName = open.replace(/\d/,''), oct = parseInt(open.match(/\d/)[0]);
+  const nIdx  = NOTE_NAMES.indexOf(nName);
+  const midi  = (oct + 1) * 12 + nIdx + fret;
+  return { freq: 440 * Math.pow(2, (midi - 69) / 12), note: NOTE_NAMES[(nIdx + fret) % 12] };
+}
+
+function playNote(stringIdx, fret, delay = 0) {
+  initAudio();
+  const { freq, note } = getFreqAndNote(stringIdx, fret);
+  const t = audioCtx.currentTime + delay;
+  const isLow = stringIdx >= 4;
+  const dur = isLow ? 3.5 : 2.6;
+
+  const osc1 = audioCtx.createOscillator();
+  const osc2 = audioCtx.createOscillator();
+  const osc3 = audioCtx.createOscillator();
+  const env  = audioCtx.createGain();
+
+  osc1.type = 'sawtooth'; osc1.frequency.value = freq;
+  osc2.type = 'square';   osc2.frequency.value = freq * 2.005;
+  osc3.type = 'triangle'; osc3.frequency.value = freq * 3.01;
+
+  const g2 = audioCtx.createGain(); g2.gain.value = 0.30;
+  const g3 = audioCtx.createGain(); g3.gain.value = 0.15;
+
+  osc1.connect(env);
+  osc2.connect(g2); g2.connect(env);
+  osc3.connect(g3); g3.connect(env);
+
+  env.gain.setValueAtTime(0, t);
+  env.gain.linearRampToValueAtTime(0.55, t + 0.007);
+  env.gain.exponentialRampToValueAtTime(0.28, t + 0.07);
+  env.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+  env.connect(dryGain);
+  env.connect(convolver);
+
+  [osc1, osc2, osc3].forEach(o => { o.start(t); o.stop(t + dur + 0.1); });
+  return { note, freq };
+}
+
+function strum(dir) {
+  const fretIdxList = [...heldFrets].map(k => FRET_KEYS.indexOf(k)).filter(i=>i>=0);
+  const fret = fretIdxList.length ? FRET_NUMS[Math.max(...fretIdxList)] : 0;
+  const strIdxList = [...heldStrings].map(k => STRING_KEYS.indexOf(k)).filter(i=>i>=0);
+  const toPlay = strIdxList.length ? strIdxList : [0,1,2,3,4,5];
+  const sorted = dir === 'down' ? [...toPlay].sort((a,b)=>b-a) : [...toPlay].sort((a,b)=>a-b);
+  const notes = [];
+  sorted.forEach((si, i) => {
+    const delay = i * 0.028;
+    const r = playNote(si, fret, delay);
+    notes.push(r);
+    flashCell(si, fret, delay);
+  });
+  showStrumDir(dir);
+  updateStatus(fret, strIdxList, notes);
+}
+
+function flashCell(si, fret, delay) {
+  setTimeout(() => {
+    const el = document.querySelector(`[data-s="${si}"][data-f="${fret}"]`);
+    if (!el) return;
+    el.classList.remove('playing'); void el.offsetWidth;
+    el.classList.add('playing');
+    setTimeout(() => el.classList.remove('playing'), 450);
+  }, delay * 1000);
+}
+
+function showStrumDir(dir) {
+  const el = document.getElementById('strum-ind');
+  el.textContent = dir === 'down' ? '↓' : '↑';
+  el.style.transform = 'scale(1.5)';
+  setTimeout(() => el.style.transform = 'scale(1)', 180);
+  document.getElementById('st-strum').textContent = dir === 'down' ? '↓ Down' : '↑ Up';
+}
+
+function updateStatus(fret, strIdxList, notes) {
+  const fretList = [...heldFrets].map(k=>{const i=FRET_KEYS.indexOf(k);return i>=0?FRET_NUMS[i]:null;}).filter(Boolean);
+  document.getElementById('st-frets').textContent = fretList.length ? fretList.join(', ') : 'Open';
+  const strList = strIdxList.map(i=>STRING_LABELS[i]);
+  document.getElementById('st-strings').textContent = strList.length ? strList.join(', ') : 'All';
+  if (notes.length) document.getElementById('st-note').textContent = [...new Set(notes.map(n=>n.note))].join(', ');
+}
+
+function highlightFrets() {
+  document.querySelectorAll('.fc').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('lit'));
+  const fi = [...heldFrets].map(k=>FRET_KEYS.indexOf(k)).filter(i=>i>=0);
+  const si = [...heldStrings].map(k=>STRING_KEYS.indexOf(k)).filter(i=>i>=0);
+  fi.forEach(fidx => {
+    const f = FRET_NUMS[fidx];
+    (si.length ? si : [0,1,2,3,4,5]).forEach(s => {
+      const el = document.querySelector(`[data-s="${s}"][data-f="${f}"]`);
+      if (el) el.classList.add('active');
+    });
+    const chip = document.querySelector(`.fchip[data-k="${FRET_KEYS[fidx]}"]`);
+    if (chip) chip.classList.add('lit');
+  });
+  [...heldStrings].forEach(k => {
+    const chip = document.querySelector(`.schip[data-k="${k}"]`);
+    if (chip) chip.classList.add('lit');
+  });
+  const fretList = fi.map(i=>FRET_NUMS[i]);
+  document.getElementById('st-frets').textContent = fretList.length ? fretList.join(', ') : 'Open';
+  const strList = [...heldStrings].map(k=>{const i=STRING_KEYS.indexOf(k);return i>=0?STRING_LABELS[i]:null;}).filter(Boolean);
+  document.getElementById('st-strings').textContent = strList.length ? strList.join(', ') : 'All';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.repeat) return;
+  initAudio();
+  const k = e.key.toLowerCase();
+  if (FRET_KEYS.includes(k)) { heldFrets.add(k); highlightFrets(); }
+  if (STRING_KEYS.includes(k)) {
+    heldStrings.add(k); highlightFrets();
+    const si = STRING_KEYS.indexOf(k);
+    const fi = [...heldFrets].map(i=>FRET_KEYS.indexOf(i)).filter(i=>i>=0);
+    const fret = fi.length ? FRET_NUMS[Math.max(...fi)] : 0;
+    const r = playNote(si, fret, 0);
+    flashCell(si, fret, 0);
+    document.getElementById('st-note').textContent = r.note;
+  }
+  if (e.key === 'ArrowDown') { e.preventDefault(); strum('down'); }
+  if (e.key === 'ArrowUp')   { e.preventDefault(); strum('up'); }
+  if (e.key === ' ')         { e.preventDefault(); heldStrings.clear(); strum('down'); }
+});
+document.addEventListener('keyup', e => {
+  heldFrets.delete(e.key.toLowerCase());
+  heldStrings.delete(e.key.toLowerCase());
+  highlightFrets();
+});
+
+function buildFretboard() {
+  const fb = document.getElementById('fretboard');
+  fb.innerHTML = '';
+  const DOT_FRETS = new Set([3,5,7,9]);
+
+  const corner = document.createElement('div');
+  corner.className = 'fh nut-col'; corner.textContent = '♩';
+  fb.appendChild(corner);
+  FRET_NUMS.forEach(fn => {
+    const h = document.createElement('div');
+    h.className = 'fh' + (fn===12?' has-dot2':DOT_FRETS.has(fn)?' has-dot':'');
+    h.textContent = fn; fb.appendChild(h);
+  });
+
+  for (let si = 5; si >= 0; si--) {
+    const colors = ['#c0843a','#b07030','#a06028','#906020','#804018','#703010'];
+    const sl = document.createElement('div');
+    sl.className = 'sl'; sl.textContent = STRING_LABELS[si];
+    sl.style.color = colors[si]; fb.appendChild(sl);
+
+    FRET_NUMS.forEach(fn => {
+      const cell = document.createElement('div');
+      cell.className = `fc s${si}`;
+      cell.dataset.s = si; cell.dataset.f = fn;
+      cell.addEventListener('mousedown', () => {
+        initAudio();
+        const r = playNote(si, fn, 0);
+        cell.classList.remove('playing'); void cell.offsetWidth;
+        cell.classList.add('playing');
+        setTimeout(() => cell.classList.remove('playing'), 450);
+        document.getElementById('st-note').textContent = r.note;
+        document.getElementById('st-frets').textContent = fn;
+        document.getElementById('st-strings').textContent = STRING_LABELS[si];
+      });
+      fb.appendChild(cell);
+    });
+  }
+}
+
+function buildChips() {
+  const fc = document.getElementById('fret-chips');
+  fc.innerHTML = '';
+  FRET_KEYS.forEach((k, i) => {
+    const c = document.createElement('div');
+    c.className = 'chip fchip'; c.dataset.k = k;
+    c.innerHTML = `<span class="ck">${k==='-'?'−':k==='='?'+':k}</span><span class="cl">Fret ${FRET_NUMS[i]}</span>`;
+    fc.appendChild(c);
+  });
+  const sc = document.getElementById('str-chips');
+  sc.innerHTML = '';
+  STRING_KEYS.forEach((k, i) => {
+    const c = document.createElement('div');
+    c.className = 'chip schip'; c.dataset.k = k;
+    c.innerHTML = `<span class="ck">${k.toUpperCase()}</span><span class="cl">${STRING_LABELS[i]} str</span>`;
+    sc.appendChild(c);
+  });
+}
+
+document.getElementById('vol').addEventListener('input', e => {
+  volume = e.target.value / 100;
+  document.getElementById('vol-val').textContent = e.target.value + '%';
+  if (masterGain) masterGain.gain.value = volume;
+});
+document.getElementById('rvb').addEventListener('input', e => {
+  reverbAmt = e.target.value / 100;
+  document.getElementById('rvb-val').textContent = e.target.value + '%';
+  if (dryGain) dryGain.gain.value = 1 - reverbAmt;
+  if (reverbGainNode) reverbGainNode.gain.value = reverbAmt * 1.4;
+});
+document.getElementById('tuning-sel').addEventListener('change', e => {
+  currentTuning = e.target.value;
+  buildFretboard();
+});
+
+buildFretboard();
+buildChips();
+</script>
+</body>
+</html>
